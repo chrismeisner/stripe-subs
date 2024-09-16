@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stripe Subscribers</title>
+  <style>
+	body {
+	  font-family: Arial, sans-serif;
+	  margin: 40px;
+	}
+	h1 {
+	  text-align: center;
+	}
+	.filter-container {
+	  text-align: center;
+	  margin-bottom: 20px;
+	}
+	.counter-container {
+	  text-align: left;
+	  margin-bottom: 10px;
+	}
+	.subscriber-list {
+	  margin-top: 20px;
+	  border-collapse: collapse;
+	  width: 100%;
+	}
+	.subscriber-list th, .subscriber-list td {
+	  border: 1px solid #ddd;
+	  padding: 8px;
+	}
+	.subscriber-list th {
+	  background-color: #f2f2f2;
+	}
+	.loader {
+	  display: none;
+	  text-align: center;
+	  margin-top: 20px;
+	}
+
+	/* Modal Styles */
+	.modal {
+	  display: none; /* Hidden by default */
+	  position: fixed; /* Stay in place */
+	  z-index: 1; /* Sit on top */
+	  left: 0;
+	  top: 0;
+	  width: 100%;
+	  height: 100%;
+	  overflow: auto; /* Enable scroll if needed */
+	  background-color: rgba(0, 0, 0, 0.4); /* Black with transparency */
+	}
+
+	.modal-content {
+	  background-color: #fefefe;
+	  margin: 15% auto; /* 15% from the top and centered */
+	  padding: 20px;
+	  border: 1px solid #888;
+	  width: 80%; /* Could be more or less, depending on screen size */
+	}
+
+	.close-btn {
+	  color: #aaa;
+	  float: right;
+	  font-size: 28px;
+	  font-weight: bold;
+	}
+
+	.close-btn:hover,
+	.close-btn:focus {
+	  color: black;
+	  text-decoration: none;
+	  cursor: pointer;
+	}
+  </style>
+</head>
+<body>
+  <h1>Current Stripe Subscribers</h1>
+
+  <div class="filter-container">
+	<select id="filter-dropdown" onchange="filterSubscribers()">
+	  <option value="">All Products</option>
+	</select>
+  </div>
+
+  <div class="counter-container">
+	<span id="record-counter">Records retrieved: 0</span>
+	<br>
+	<button onclick="copyEmailAddresses()">Copy Email Addresses</button>
+	<br>
+	<!-- Add the Compose SMS button here -->
+	<button onclick="openSmsModal()">Compose SMS</button>
+  </div>
+
+  <div class="loader">Loading subscribers...</div>
+  <table class="subscriber-list" id="subscriber-list">
+	<thead>
+	  <tr>
+		<th>ID</th>
+		<th>Email</th>
+		<th>Name</th>
+		<th>Phone</th> <!-- New Phone Column -->
+		<th>Subscription Status</th>
+		<th>Plan</th>
+		<th>Product Name</th>
+		<th>Amount Charged</th>
+		<th>Currency</th>
+		<th>Current Period End</th>
+		<th>Trial End</th>
+		<th>Subscription Start</th>
+		<th>Billing Interval</th>
+		<th>Discount</th>
+	  </tr>
+	</thead>
+	<tbody></tbody>
+  </table>
+
+  <!-- Modal for Compose SMS -->
+  <div id="smsModal" class="modal">
+	<div class="modal-content">
+	  <span class="close-btn" onclick="closeSmsModal()">&times;</span>
+	  <h2>Compose SMS</h2>
+	  <p>Sending to:</p>
+	  
+	  <!-- Select/Deselect All Buttons -->
+	  <button onclick="selectAllNumbers()">Select All</button>
+	  <button onclick="deselectAllNumbers()">Deselect All</button>
+	  
+	  <ul id="mobile-numbers-list">
+		<!-- Mobile numbers with checkboxes will be populated here -->
+	  </ul>
+	  <textarea id="sms-message" rows="5" cols="40" placeholder="Enter your SMS message here..."></textarea>
+	</div>
+  </div>
+
+  <script>
+	let subscribersData = []; // Store the unfiltered data
+	let filteredData = []; // Store the filtered data for rendering
+
+	// Function to fetch subscribers from the server
+	async function fetchSubscribers() {
+	  try {
+		const loader = document.querySelector('.loader');
+		loader.style.display = 'block';
+		
+		const response = await fetch('/get-subscribers');
+		const data = await response.json();
+
+		loader.style.display = 'none';
+		subscribersData = data.subscribers; // Store subscribers data
+		filteredData = subscribersData; // Initialize filteredData with all subscribers
+
+		// Get unique product names and populate the dropdown
+		populateProductDropdown(subscribersData);
+
+		renderSubscribers(filteredData); // Initially render all subscribers
+	  } catch (error) {
+		console.error('Error fetching subscribers:', error);
+	  }
+	}
+
+	// Function to render subscribers and update the counter
+	function renderSubscribers(subscribers) {
+	  const tableBody = document.querySelector('#subscriber-list tbody');
+	  const recordCounter = document.getElementById('record-counter');
+	  tableBody.innerHTML = ''; // Clear the table body
+
+	  // Update the counter
+	  recordCounter.innerText = `Records retrieved: ${subscribers.length}`;
+
+	  // Render rows
+	  subscribers.forEach(subscriber => {
+		const row = `
+		  <tr>
+			<td>${subscriber.id}</td>
+			<td>${subscriber.email}</td>
+			<td>${subscriber.name}</td>
+			<td>${subscriber.phone}</td> <!-- Render Phone -->
+			<td>${subscriber.subscription_status}</td>
+			<td>${subscriber.plan_name}</td>
+			<td>${subscriber.product_name}</td>
+			<td>${subscriber.amount_charged}</td>
+			<td>${subscriber.currency}</td>
+			<td>${subscriber.current_period_end}</td>
+			<td>${subscriber.trial_end}</td>
+			<td>${subscriber.subscription_start}</td>
+			<td>${subscriber.billing_interval}</td>
+			<td>${subscriber.discount}</td>
+		  </tr>
+		`;
+		tableBody.innerHTML += row;
+	  });
+	}
+
+	// Function to populate the dropdown with unique product names
+	function populateProductDropdown(subscribers) {
+	  const dropdown = document.getElementById('filter-dropdown');
+	  const productNames = [...new Set(subscribers.map(sub => sub.product_name))]; // Get unique product names
+
+	  productNames.forEach(product => {
+		const option = document.createElement('option');
+		option.value = product;
+		option.textContent = product;
+		dropdown.appendChild(option);
+	  });
+	}
+
+	// Function to filter subscribers based on the selected Product Name from the dropdown
+	function filterSubscribers() {
+	  const filterValue = document.getElementById('filter-dropdown').value;
+
+	  // Filter the original subscribersData based on the selected product
+	  if (filterValue === "") {
+		filteredData = subscribersData; // Show all if "All Products" is selected
+	  } else {
+		filteredData = subscribersData.filter(subscriber =>
+		  subscriber.product_name === filterValue
+		);
+	  }
+
+	  // Render the filtered data
+	  renderSubscribers(filteredData);
+	}
+
+	// Function to copy email addresses from the filtered rows
+	function copyEmailAddresses() {
+	  const emails = filteredData.map(subscriber => subscriber.email).join(', ');
+
+	  // Create a temporary text area element to copy the emails to the clipboard
+	  const tempTextArea = document.createElement('textarea');
+	  tempTextArea.value = emails;
+	  document.body.appendChild(tempTextArea);
+	  tempTextArea.select();
+	  document.execCommand('copy');
+	  document.body.removeChild(tempTextArea);
+
+	  alert('Email addresses copied to clipboard!');
+	}
+
+	// Function to select all checkboxes
+	function selectAllNumbers() {
+	  const checkboxes = document.querySelectorAll('.sms-checkbox');
+	  checkboxes.forEach(checkbox => {
+		checkbox.checked = true;
+	  });
+	}
+
+	// Function to deselect all checkboxes
+	function deselectAllNumbers() {
+	  const checkboxes = document.querySelectorAll('.sms-checkbox');
+	  checkboxes.forEach(checkbox => {
+		checkbox.checked = false;
+	  });
+	}
+
+	// Open the modal and populate it with mobile numbers and checkboxes
+	function openSmsModal() {
+	  const modal = document.getElementById("smsModal");
+	  const mobileNumbersList = document.getElementById("mobile-numbers-list");
+
+	  // Clear existing numbers in the modal
+	  mobileNumbersList.innerHTML = '';
+
+	  // Get phone numbers from the filtered data
+	  const phoneNumbers = filteredData.map(subscriber => subscriber.phone).filter(phone => phone !== 'N/A');
+
+	  if (phoneNumbers.length === 0) {
+		mobileNumbersList.innerHTML = '<li>No phone numbers available.</li>';
+	  } else {
+		// Populate the modal with phone numbers and checkboxes (checked by default)
+		phoneNumbers.forEach(number => {
+		  const li = document.createElement('li');
+		  li.innerHTML = `
+			<label>
+			  <input type="checkbox" class="sms-checkbox" value="${number}" checked> ${number}
+			</label>
+		  `;
+		  mobileNumbersList.appendChild(li);
+		});
+	  }
+
+	  // Show the modal
+	  modal.style.display = "block";
+	}
+
+	// Function to close the modal
+	function closeSmsModal() {
+	  const modal = document.getElementById("smsModal");
+	  modal.style.display = "none";
+	}
+
+	// Function to get selected phone numbers
+	function getSelectedPhoneNumbers() {
+	  const checkboxes = document.querySelectorAll('.sms-checkbox');
+	  const selectedNumbers = Array.from(checkboxes)
+		 .filter(checkbox => checkbox.checked)
+		 .map(checkbox => checkbox.value);
+
+	  return selectedNumbers;
+	}
+
+	// Close modal when clicking outside of it
+	window.onclick = function(event) {
+	  const modal = document.getElementById("smsModal");
+	  if (event.target == modal) {
+		modal.style.display = "none";
+	  }
+	}
+
+	// Call the function on page load
+	fetchSubscribers();
+  </script>
+</body>
+</html>

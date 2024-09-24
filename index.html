@@ -88,8 +88,9 @@
 	<br>
 	<button onclick="copyEmailAddresses()">Copy Email Addresses</button>
 	<br>
-	<!-- Add the Compose SMS button here -->
 	<button onclick="openSmsModal()">Compose SMS</button>
+	<br>
+	<button onclick="openZoomModal()">Schedule New Zoom</button>
   </div>
 
   <div class="loader">Loading subscribers...</div>
@@ -99,7 +100,7 @@
 		<th>ID</th>
 		<th>Email</th>
 		<th>Name</th>
-		<th>Phone</th> <!-- New Phone Column -->
+		<th>Phone</th>
 		<th>Subscription Status</th>
 		<th>Plan</th>
 		<th>Product Name</th>
@@ -122,14 +123,43 @@
 	  <h2>Compose SMS</h2>
 	  <p>Sending to:</p>
 	  
-	  <!-- Select/Deselect All Buttons -->
 	  <button onclick="selectAllNumbers()">Select All</button>
 	  <button onclick="deselectAllNumbers()">Deselect All</button>
 	  
-	  <ul id="mobile-numbers-list">
-		<!-- Mobile numbers with checkboxes will be populated here -->
-	  </ul>
+	  <ul id="mobile-numbers-list"></ul>
 	  <textarea id="sms-message" rows="5" cols="40" placeholder="Enter your SMS message here..."></textarea>
+	  
+	  <button onclick="sendSms()">Send SMS</button>
+	</div>
+  </div>
+
+  <!-- Modal for Schedule New Zoom -->
+  <div id="zoomModal" class="modal">
+	<div class="modal-content">
+	  <span class="close-btn" onclick="closeZoomModal()">&times;</span>
+	  <h2>Schedule New Zoom</h2>
+	  
+	  <label for="zoom-topic">Topic:</label>
+	  <input type="text" id="zoom-topic" placeholder="Enter the meeting topic" required>
+	  
+	  <label for="zoom-email">Email:</label>
+	  <input type="email" id="zoom-email" placeholder="Enter the email to invite" required>
+
+	  <p>Sending invitation to:</p>
+	  <ul id="zoom-emails-list"></ul> <!-- New container for the emails -->
+
+	  <label for="zoom-date">When:</label>
+	  <input type="datetime-local" id="zoom-date" required>
+	  
+	  <label for="zoom-duration">Duration (minutes):</label>
+	  <input type="number" id="zoom-duration" min="1" placeholder="Enter duration in minutes" required>
+	  
+	  <label for="zoom-timezone">Time Zone:</label>
+	  <select id="zoom-timezone">
+		<option value="America/Phoenix">America/Phoenix</option>
+	  </select>
+	  
+	  <button onclick="scheduleZoom()">Schedule Zoom</button>
 	</div>
   </div>
 
@@ -175,7 +205,7 @@
 			<td>${subscriber.id}</td>
 			<td>${subscriber.email}</td>
 			<td>${subscriber.name}</td>
-			<td>${subscriber.phone}</td> <!-- Render Phone -->
+			<td>${subscriber.phone}</td>
 			<td>${subscriber.subscription_status}</td>
 			<td>${subscriber.plan_name}</td>
 			<td>${subscriber.product_name}</td>
@@ -283,27 +313,71 @@
 	  modal.style.display = "block";
 	}
 
-	// Function to close the modal
+	// Function to close the SMS modal
 	function closeSmsModal() {
 	  const modal = document.getElementById("smsModal");
 	  modal.style.display = "none";
 	}
 
-	// Function to get selected phone numbers
-	function getSelectedPhoneNumbers() {
-	  const checkboxes = document.querySelectorAll('.sms-checkbox');
-	  const selectedNumbers = Array.from(checkboxes)
-		 .filter(checkbox => checkbox.checked)
-		 .map(checkbox => checkbox.value);
+	// Open the Zoom modal and populate it with email addresses
+	function openZoomModal() {
+	  const modal = document.getElementById("zoomModal");
+	  const emailList = document.getElementById("zoom-emails-list");
 
-	  return selectedNumbers;
+	  // Clear existing emails in the modal
+	  emailList.innerHTML = '';
+
+	  // Get email addresses from the filtered data
+	  const emails = filteredData.map(subscriber => subscriber.email).filter(email => email !== '');
+
+	  if (emails.length === 0) {
+		emailList.innerHTML = '<li>No emails available.</li>';
+	  } else {
+		// Populate the modal with email addresses
+		emails.forEach(email => {
+		  const li = document.createElement('li');
+		  li.textContent = email;
+		  emailList.appendChild(li);
+		});
+	  }
+
+	  // Show the modal
+	  modal.style.display = "block";
+	}
+
+	// Function to close the Zoom modal
+	function closeZoomModal() {
+	  const modal = document.getElementById("zoomModal");
+	  modal.style.display = "none";
+	}
+
+	// Function to schedule Zoom
+	function scheduleZoom() {
+	  const topic = document.getElementById('zoom-topic').value;
+	  const email = document.getElementById('zoom-email').value;
+	  const when = document.getElementById('zoom-date').value;
+	  const duration = document.getElementById('zoom-duration').value;
+	  const timezone = document.getElementById('zoom-timezone').value;
+
+	  if (!topic || !email || !when || !duration) {
+		alert('Please fill in all fields.');
+		return;
+	  }
+
+	  alert(`Scheduled Zoom meeting:\n- Topic: ${topic}\n- Email: ${email}\n- When: ${when}\n- Duration: ${duration} minutes\n- Time Zone: ${timezone}`);
+	  
+	  closeZoomModal(); // Close the modal after scheduling
 	}
 
 	// Close modal when clicking outside of it
 	window.onclick = function(event) {
-	  const modal = document.getElementById("smsModal");
-	  if (event.target == modal) {
-		modal.style.display = "none";
+	  const smsModal = document.getElementById("smsModal");
+	  const zoomModal = document.getElementById("zoomModal");
+	  if (event.target == smsModal) {
+		smsModal.style.display = "none";
+	  }
+	  if (event.target == zoomModal) {
+		zoomModal.style.display = "none";
 	  }
 	}
 

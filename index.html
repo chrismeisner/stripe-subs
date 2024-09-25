@@ -146,7 +146,10 @@
 	  <input type="email" id="zoom-email" placeholder="Enter the email to invite" required>
 
 	  <p>Sending invitation to:</p>
-	  <ul id="zoom-emails-list"></ul> <!-- New container for the emails -->
+	  
+	  <button onclick="selectAllEmails()">Select All</button>
+	  <button onclick="deselectAllEmails()">Deselect All</button>
+	  <ul id="zoom-emails-list"></ul> <!-- List of emails with checkboxes -->
 
 	  <label for="zoom-date">When:</label>
 	  <input type="datetime-local" id="zoom-date" required>
@@ -267,7 +270,7 @@
 	  alert('Email addresses copied to clipboard!');
 	}
 
-	// Function to select all checkboxes
+	// Function to select all checkboxes for mobile numbers
 	function selectAllNumbers() {
 	  const checkboxes = document.querySelectorAll('.sms-checkbox');
 	  checkboxes.forEach(checkbox => {
@@ -275,7 +278,7 @@
 	  });
 	}
 
-	// Function to deselect all checkboxes
+	// Function to deselect all checkboxes for mobile numbers
 	function deselectAllNumbers() {
 	  const checkboxes = document.querySelectorAll('.sms-checkbox');
 	  checkboxes.forEach(checkbox => {
@@ -319,7 +322,7 @@
 	  modal.style.display = "none";
 	}
 
-	// Open the Zoom modal and populate it with email addresses
+	// Open the Zoom modal and populate it with email addresses and checkboxes
 	function openZoomModal() {
 	  const modal = document.getElementById("zoomModal");
 	  const emailList = document.getElementById("zoom-emails-list");
@@ -333,10 +336,14 @@
 	  if (emails.length === 0) {
 		emailList.innerHTML = '<li>No emails available.</li>';
 	  } else {
-		// Populate the modal with email addresses
+		// Populate the modal with email addresses and checkboxes (checked by default)
 		emails.forEach(email => {
 		  const li = document.createElement('li');
-		  li.textContent = email;
+		  li.innerHTML = `
+			<label>
+			  <input type="checkbox" class="zoom-email-checkbox" value="${email}" checked> ${email}
+			</label>
+		  `;
 		  emailList.appendChild(li);
 		});
 	  }
@@ -345,27 +352,73 @@
 	  modal.style.display = "block";
 	}
 
+	// Function to select all email checkboxes in the Zoom modal
+	function selectAllEmails() {
+	  const checkboxes = document.querySelectorAll('.zoom-email-checkbox');
+	  checkboxes.forEach(checkbox => {
+		checkbox.checked = true;
+	  });
+	}
+
+	// Function to deselect all email checkboxes in the Zoom modal
+	function deselectAllEmails() {
+	  const checkboxes = document.querySelectorAll('.zoom-email-checkbox');
+	  checkboxes.forEach(checkbox => {
+		checkbox.checked = false;
+	  });
+	}
+
 	// Function to close the Zoom modal
 	function closeZoomModal() {
 	  const modal = document.getElementById("zoomModal");
 	  modal.style.display = "none";
 	}
 
-	// Function to schedule Zoom
-	function scheduleZoom() {
+	// Function to schedule Zoom and send selected invitees
+	async function scheduleZoom() {
 	  const topic = document.getElementById('zoom-topic').value;
 	  const email = document.getElementById('zoom-email').value;
 	  const when = document.getElementById('zoom-date').value;
 	  const duration = document.getElementById('zoom-duration').value;
 	  const timezone = document.getElementById('zoom-timezone').value;
+	
+	  // Collect all selected emails from the checkboxes
+	  const selectedEmails = Array.from(document.querySelectorAll('.zoom-email-checkbox:checked')).map(checkbox => checkbox.value);
 
+	  const invitees = selectedEmails.join(', ');  // Combine the emails into a comma-separated string
+	
 	  if (!topic || !email || !when || !duration) {
 		alert('Please fill in all fields.');
 		return;
 	  }
-
-	  alert(`Scheduled Zoom meeting:\n- Topic: ${topic}\n- Email: ${email}\n- When: ${when}\n- Duration: ${duration} minutes\n- Time Zone: ${timezone}`);
-	  
+	
+	  try {
+		const response = await fetch('/schedule-zoom', {
+		  method: 'POST',
+		  headers: {
+			'Content-Type': 'application/json',
+		  },
+		  body: JSON.stringify({
+			topic,
+			email,
+			when,
+			duration,
+			timezone,
+			invitees // Only send the selected invitees
+		  }),
+		});
+	
+		const data = await response.json();
+		if (data.success) {
+		  alert('Zoom meeting scheduled and record saved to Airtable!');
+		} else {
+		  alert('Error scheduling Zoom meeting.');
+		}
+	  } catch (error) {
+		console.error('Error scheduling Zoom:', error);
+		alert('Error scheduling Zoom meeting.');
+	  }
+	
 	  closeZoomModal(); // Close the modal after scheduling
 	}
 
